@@ -4,83 +4,54 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
-type Input struct {
-	FirstNumber  *int    `json:"first_number"`
-	SecondNumber *int    `json:"second_number"`
-	Operator     *string `json:"operator"`
-}
-
 type Output struct {
-	Result float64 `json:"result"`
+	Result string `json:"result"`
 }
 
 // Обработчик HTTP-запроса
 func CalculateHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		w.WriteHeader(405)
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
 		w.Write([]byte("method not allowed"))
 		return
 	}
 
-	var input Input
+	if !r.URL.Query().Has("string") {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Query params don't have property \"string\"!"))
+		return
+	}
+	str := r.URL.Query().Get("string")
 
-	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&input)
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	if input.FirstNumber == nil {
-		w.WriteHeader(400)
-		w.Write([]byte("first_number is missing"))
-		return
-	}
-	if input.SecondNumber == nil {
-		w.WriteHeader(400)
-		w.Write([]byte("second_number is missing"))
-		return
-	}
-	if input.Operator == nil {
-		w.WriteHeader(400)
-		w.Write([]byte("operator is missing"))
+	if str == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("string is empty!"))
 		return
 	}
 
 	var output Output
-
-	switch *input.Operator {
-	case "+":
-		output.Result = float64(*input.FirstNumber) + float64(*input.SecondNumber)
-	case "-":
-		output.Result = float64(*input.FirstNumber) - float64(*input.SecondNumber)
-	case "*":
-		output.Result = float64(*input.FirstNumber) * float64(*input.SecondNumber)
-	case "/":
-		if *input.SecondNumber == 0 {
-			w.WriteHeader(400)
-			w.Write([]byte("division by zero is not allowed"))
+	for _, symbol := range str {
+		number, err := strconv.Atoi(string(symbol))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("wrong format of string!"))
 			return
 		}
-		output.Result = float64(*input.FirstNumber) / float64(*input.SecondNumber)
-	default:
-		w.WriteHeader(400)
-		w.Write([]byte("unknown operator"))
-		return
+		output.Result += strconv.Itoa(number * number * number)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	respBytes, _ := json.Marshal(output)
 	w.Write(respBytes)
 }
 
 func main() {
 	// Регистрируем обработчик для пути "/calculate"
-	http.HandleFunc("/calculate", CalculateHandler)
+	http.HandleFunc("/kub", CalculateHandler)
 
 	// Запускаем веб-сервер на порту 8081
 	fmt.Println("starting server...")
